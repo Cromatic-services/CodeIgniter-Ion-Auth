@@ -5,7 +5,7 @@ if ( ! class_exists('Controller'))
 	class Controller extends CI_Controller {}
 }
 
-class Auth extends Controller {
+class Auth extends CROC_Controller {
 
 	function __construct()
 	{
@@ -13,8 +13,10 @@ class Auth extends Controller {
 		$this->load->library('ion_auth');
 		$this->load->library('session');
 		$this->load->library('form_validation');
-		$this->load->database();
 		$this->load->helper('url');
+		
+		/* overide $this->load */
+		
 	}
 
 	//redirect if needed, otherwise display the user list
@@ -37,7 +39,7 @@ class Auth extends Controller {
 
 			//list the users
 			$this->data['users'] = $this->ion_auth->get_users_array();
-			$this->load->view('auth/index', $this->data);
+			redirect('security/users');
 		}
 	}
 
@@ -53,7 +55,10 @@ class Auth extends Controller {
 		}
 
 		//validate form input
-		$this->form_validation->set_rules('email', 'Email Address', 'required|valid_email');
+		$identity_validation = 'required';
+		if ($this->config->config['ion_auth']['identity'] == 'email')
+			$identity_validation .= '|valid_email';
+		$this->form_validation->set_rules('email', 'Email Address', $identity_validation);
 		$this->form_validation->set_rules('password', 'Password', 'required');
 
 		if ($this->form_validation->run() == true)
@@ -89,7 +94,7 @@ class Auth extends Controller {
 				'type' => 'password',
 			);
 
-			$this->load->view('auth/login', $this->data);
+			$this->_renderAuth('auth/login', $this->data);
 		}
 	}
 
@@ -142,7 +147,7 @@ class Auth extends Controller {
 			);
 
 			//render
-			$this->load->view('auth/change_password', $this->data);
+			$this->_renderAuth('auth/change_password', $this->data);
 		}
 		else
 		{
@@ -179,7 +184,7 @@ class Auth extends Controller {
 			//set any errors and display the form
 			$this->data['message'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('message');
 			$this->data['identity'] = $identity; $this->data['identity_human'] = $identity_human;
-			$this->load->view('auth/forgot_password', $this->data);
+			$this->_renderAuth('auth/forgot_password', $this->data);
 		}
 		else
 		{
@@ -253,7 +258,7 @@ class Auth extends Controller {
 			// insert csrf check
 			$this->data['csrf'] = $this->_get_csrf_nonce();
 			$this->data['user'] = $this->ion_auth->get_user_array($id);
-			$this->load->view('auth/deactivate_user', $this->data);
+			$this->_renderAuth('auth/deactivate_user', $this->data);
 		}
 		else
 		{
@@ -270,11 +275,12 @@ class Auth extends Controller {
 				if ($this->ion_auth->logged_in() && $this->ion_auth->is_admin())
 				{
 					$this->ion_auth->deactivate($id);
+					$this->session->set_flashdata('message', lang('deactivate_success'));
 				}
 			}
 
 			//redirect them back to the auth page
-			redirect('auth', 'refresh');
+			redirect('security/users');
 		}
 	}
 
@@ -288,20 +294,41 @@ class Auth extends Controller {
 			redirect('auth', 'refresh');
 		}
 
+		$config_identity = $this->config->config['ion_auth']['identity'];
+		$columns_create_form = $this->config->config['ion_auth']['columns_create_form'];
+		
+		if (!in_array('email', $columns_create_form)) {
+			throw new \Exception("Email must be specified for config columns_create_form in ion_auth");
+		}
+		
 		//validate form input
-		$this->form_validation->set_rules('first_name', 'First Name', 'required|xss_clean');
-		$this->form_validation->set_rules('last_name', 'Last Name', 'required|xss_clean');
-		$this->form_validation->set_rules('email', 'Email Address', 'required|valid_email');
-		$this->form_validation->set_rules('phone1', 'First Part of Phone', 'required|xss_clean|min_length[3]|max_length[3]');
-		$this->form_validation->set_rules('phone2', 'Second Part of Phone', 'required|xss_clean|min_length[3]|max_length[3]');
-		$this->form_validation->set_rules('phone3', 'Third Part of Phone', 'required|xss_clean|min_length[4]|max_length[4]');
-		$this->form_validation->set_rules('company', 'Company Name', 'required|xss_clean');
+		if (in_array('username', $columns_create_form))
+			$this->form_validation->set_rules('username', lang(sprintf('create_user_%s_label', 'username')), 'required|xss_clean');
+		if (in_array('first_name', $columns_create_form))
+			$this->form_validation->set_rules('first_name', lang(sprintf('create_user_%s_label', 'first_name')), 'required|xss_clean');
+		if (in_array('last_name', $columns_create_form))
+			$this->form_validation->set_rules('last_name', lang(sprintf('create_user_%s_label', 'last_name')), 'required|xss_clean');
+		if (in_array('email', $columns_create_form))
+			$this->form_validation->set_rules('email', lang(sprintf('create_user_%s_label', 'email')), 'required|valid_email');
+		if (in_array('phone1', $columns_create_form))
+			$this->form_validation->set_rules('phone1', lang(sprintf('create_user_%s_label', 'phone1')), 'required|xss_clean|min_length[3]|max_length[3]');
+		if (in_array('phone2', $columns_create_form))
+			$this->form_validation->set_rules('phone2', lang(sprintf('create_user_%s_label', 'phone2')), 'required|xss_clean|min_length[3]|max_length[3]');
+		if (in_array('phone3', $columns_create_form))
+			$this->form_validation->set_rules('phone3', lang(sprintf('create_user_%s_label', 'phone3')), 'required|xss_clean|min_length[4]|max_length[4]');
+		if (in_array('company', $columns_create_form))
+			$this->form_validation->set_rules('company', lang(sprintf('create_user_%s_label', 'company')), 'required|xss_clean');
+		
 		$this->form_validation->set_rules('password', 'Password', 'required|min_length[' . $this->config->item('min_password_length', 'ion_auth') . ']|max_length[' . $this->config->item('max_password_length', 'ion_auth') . ']|matches[password_confirm]');
 		$this->form_validation->set_rules('password_confirm', 'Password Confirmation', 'required');
-
+		
 		if ($this->form_validation->run() == true)
 		{
-			$username = strtolower($this->input->post('first_name')) . ' ' . strtolower($this->input->post('last_name'));
+			if (in_array('username', $columns_create_form))
+				$username = $this->input->post('username');
+			else
+				$username = $this->input->post('email');
+			
 			$email = $this->input->post('email');
 			$password = $this->input->post('password');
 
@@ -314,49 +341,24 @@ class Auth extends Controller {
 		if ($this->form_validation->run() == true && $this->ion_auth->register($username, $password, $email, $additional_data))
 		{ //check to see if we are creating the user
 			//redirect them back to the admin page
-			$this->session->set_flashdata('message', "User Created");
-			redirect('auth', 'refresh');
+			$this->session->set_flashdata('message', lang('create_user_success'));
+			redirect('security/users');
 		}
 		else
 		{ //display the create user form
 			//set the flash data error message if there is one
 			$this->data['message'] = (validation_errors() ? validation_errors() : ($this->ion_auth->errors() ? $this->ion_auth->errors() : $this->session->flashdata('message')));
-
-			$this->data['first_name'] = array('name' => 'first_name',
-				'id' => 'first_name',
-				'type' => 'text',
-				'value' => $this->form_validation->set_value('first_name'),
-			);
-			$this->data['last_name'] = array('name' => 'last_name',
-				'id' => 'last_name',
-				'type' => 'text',
-				'value' => $this->form_validation->set_value('last_name'),
-			);
-			$this->data['email'] = array('name' => 'email',
-				'id' => 'email',
-				'type' => 'text',
-				'value' => $this->form_validation->set_value('email'),
-			);
-			$this->data['company'] = array('name' => 'company',
-				'id' => 'company',
-				'type' => 'text',
-				'value' => $this->form_validation->set_value('company'),
-			);
-			$this->data['phone1'] = array('name' => 'phone1',
-				'id' => 'phone1',
-				'type' => 'text',
-				'value' => $this->form_validation->set_value('phone1'),
-			);
-			$this->data['phone2'] = array('name' => 'phone2',
-				'id' => 'phone2',
-				'type' => 'text',
-				'value' => $this->form_validation->set_value('phone2'),
-			);
-			$this->data['phone3'] = array('name' => 'phone3',
-				'id' => 'phone3',
-				'type' => 'text',
-				'value' => $this->form_validation->set_value('phone3'),
-			);
+			
+			foreach($columns_create_form as $column_name) {
+				if ($column_name == 'password')
+					continue;
+				$this->data[$column_name] = array('name' => $column_name,
+					'id' => $column_name,
+					'type' => 'text',
+					'value' => $this->form_validation->set_value($column_name),
+				);
+			}
+			// Password
 			$this->data['password'] = array('name' => 'password',
 				'id' => 'password',
 				'type' => 'password',
@@ -367,7 +369,9 @@ class Auth extends Controller {
 				'type' => 'password',
 				'value' => $this->form_validation->set_value('password_confirm'),
 			);
-			$this->load->view('auth/create_user', $this->data);
+			$this->data['columns_create_form'] = $columns_create_form;
+			$this->data['config_identity'] = $config_identity;
+			$this->_renderAuth('auth/create_user', $this->data);
 		}
 	}
 
@@ -393,6 +397,25 @@ class Auth extends Controller {
 		{
 			return FALSE;
 		}
+	}
+	
+	public function _renderAuth($view, $data = null)
+	{
+		$title = '';
+		switch($this->router->method) {
+			case 'deactivate':
+				$title = lang('deactivate_heading'); break;
+				break;
+			default:
+				$title = lang($this->router->method.'_heading'); break;
+		}
+		if (!empty($title)) {
+			$data['title'] = $title;
+		}
+		$this->_render(array_merge(
+				array('template' => __DIR__ . '/../views/'.$view.'.php'),
+				$data
+		));
 	}
 
 }

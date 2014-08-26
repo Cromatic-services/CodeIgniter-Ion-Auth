@@ -1,43 +1,38 @@
 <div class='mainInfo'>
-
-	<h1>Create User</h1>
-	<p>Please enter the users information below.</p>
 	
 	<div id="infoMessage"><?php echo $message;?></div>
 	
-    <?php echo form_open("auth/create_user");?>
-      <p>First Name:<br />
-      <?php echo form_input($first_name);?>
-      </p>
-      
-      <p>Last Name:<br />
-      <?php echo form_input($last_name);?>
-      </p>
-      
-      <p>Company Name:<br />
-      <?php echo form_input($company);?>
-      </p>
-      
-      <p>Email:<br />
-      <?php echo form_input($email);?>
-      </p>
-      
-      <p>Phone:<br />
-      <?php echo form_input($phone1);?>-<?php echo form_input($phone2);?>-<?php echo form_input($phone3);?>
-      </p>
-      
-      <p>Password:<br />
-      <?php echo form_input($password);?>
-      </p>
-      
-      <p>Confirm Password:<br />
-      <?php echo form_input($password_confirm);?>
-      </p>
-      
-      
-      <p><?php echo form_submit('submit', 'Create User');?></p>
-
-      
+    <?php echo form_open("auth/create_user", array('role' => 'form'));?>
+    <?php foreach($columns_create_form as $column_name):
+    	if ($column_name == 'password') continue;?>
+    <div class="form-group">
+		<label for="<?php echo $column_name; ?>"><?php echo lang(sprintf('create_user_%s_label', $column_name));?></label>
+		<div class="row">
+			<div class="col-lg-4 col-md-6 col-sm-10">
+	    		<?php echo form_input($$column_name, null, ' class="form-control"');?>
+	    	</div>
+	    </div>
+	</div>
+	<?php endforeach; ?>
+	<div class="form-group">
+		<label for="password"><?php echo lang('create_user_password_label');?></label>
+		<div class="row">
+			<div class="col-lg-4 col-md-6 col-sm-10">
+	    		<?php echo form_input($password, null, ' class="form-control"');?>
+	    	</div>
+	    </div>
+	</div>
+	<div class="form-group">
+		<label for="password_confirm"><?php echo lang('create_user_password_confirm_label');?></label>
+		<div class="row">
+			<div class="col-lg-4 col-md-6 col-sm-10">
+	    		<?php echo form_input($password_confirm, null, ' class="form-control"');?>
+	    	</div>
+	    </div>
+	</div>
+	<p>
+		<input type="submit" value="<?php echo lang('create_user_submit_btn');?>" class="btn btn-primary" />
+	</p>
     <?php echo form_close();?>
 
 </div>
